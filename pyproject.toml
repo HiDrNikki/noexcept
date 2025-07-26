@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "noexcept"
+version = "1.2.1"
+description = "A callable interface for structured exceptions"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+  { name = "Nichola Walch", email = "littler.compression@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = []
+
+# CLI entry point
+[project.scripts]
+noexcept = "testScript.__init__:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"no" = ["py.typed"]
