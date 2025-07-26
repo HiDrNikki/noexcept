@@ -1,7 +1,8 @@
 # no.py
 from __future__ import annotations
 import threading
-from typing import Dict, List, Optional, Tuple, Type, Set
+from typing import Dict, List, Optional, Tuple, Type, Set, overload
+
 no: NoModule
 """
 A callable interface for structured exceptions in Python.
@@ -211,6 +212,17 @@ class NoBaseError(Exception):
             loc = (None, None)
         self.linked.setdefault(key, set()).add(loc)
 
+    @overload
+    def __call__(self, exc: BaseException, *, message: str = "", soften: bool = False) -> None: ...
+    @overload
+    def __call__(self, code: int, *, message: str = "", soften: bool = False) -> None: ...
+    @overload
+    def __call__(self, code: int, msg: str, *, soften: bool = False) -> None: ...
+    @overload
+    def __call__(self, code: int, linkedExc: BaseException, *, soften: bool = False) -> None: ...
+    @overload
+    def __call__(self, codes: List[int], *, message: str = "", linked: Optional[List[BaseException]] = None, soften: bool = False) -> None: ...
+
     def __call__(self, *args, **kwargs) -> None:
         return _handleCall(self, False, *args, **kwargs)
 
@@ -239,6 +251,7 @@ class NoBaseError(Exception):
                 parts.append(f"  {exc_type.__name__}: {msg} @ {loc_text}")
 
         return "\n".join(parts)
+
 
 
 class NoModule:
@@ -331,6 +344,17 @@ class NoModule:
                 linkedCodes or [],
                 soft
             )
+
+    @overload
+    def __call__(self, exc: BaseException, *, message: str = "", soften: bool = False) -> None: ...
+    @overload
+    def __call__(self, code: int, *, message: str = "", soften: bool = False) -> None: ...
+    @overload
+    def __call__(self, code: int, msg: str, *, soften: bool = False) -> None: ...
+    @overload
+    def __call__(self, code: int, linkedExc: BaseException, *, soften: bool = False) -> None: ...
+    @overload
+    def __call__(self, codes: List[int], *, message: str = "", linked: Optional[List[BaseException]] = None, soften: bool = False) -> None: ...
 
     def __call__(self, *args, **kwargs) -> None:
         return _handleCall(self, True, *args, **kwargs)

@@ -23,9 +23,17 @@ Rich String Output: Automatically include codes, messages, linked exceptions, an
 
 Requires Python 3.11 or newer.
 
-### From PyPI
-```python
+### With PIP
+```bash
 pip install noexcept
+```
+### With github
+```bash
+pip install git+https://github.com/HiDrNikki/noexcept.git
+
+pip install git+https://github.com/HiDrNikki/noexcept.git@v1.2.2
+
+pip install -e git+https://github.com/HiDrNikki/noexcept.git@main#egg=noexcept
 ```
 ## Quick Start
 
