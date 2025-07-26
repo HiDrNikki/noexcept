@@ -213,6 +213,8 @@ class NoBaseError(Exception):
         self.linked.setdefault(key, set()).add(loc)
 
     @overload
+    def __call__(self, soften: bool = False) -> None: ...
+    @overload
     def __call__(self, exc: BaseException, *, message: str = "", soften: bool = False) -> None: ...
     @overload
     def __call__(self, code: int, *, message: str = "", soften: bool = False) -> None: ...
@@ -252,13 +254,12 @@ class NoBaseError(Exception):
 
         return "\n".join(parts)
 
-
-
 class NoModule:
     xcpt: type["NoBaseError"]
 
     def __init__(self):
         self._registry: Dict[int, Tuple[Type[NoBaseError], str, List[int], bool]] = {}
+        self._pending: Optional[NoBaseError] = None
         self._lock = threading.Lock()
 
     def register(
@@ -346,6 +347,8 @@ class NoModule:
             )
 
     @overload
+    def __call__(self, soften: bool = False) -> None: ...
+    @overload
     def __call__(self, exc: BaseException, *, message: str = "", soften: bool = False) -> None: ...
     @overload
     def __call__(self, code: int, *, message: str = "", soften: bool = False) -> None: ...
@@ -393,129 +396,159 @@ class NoModule:
         """
         raise NotImplementedError("Language support not implemented yet.")
     
-def _handleCall(context, isModule: bool, *args, **kwargs):
+def _handleCall(context, isModule: bool, *args, message=None, soften=False):
     import inspect
     import sys
 
-    message = kwargs.pop("message", None)
-    linked = kwargs.pop("linked", None)
-    soften = kwargs.pop("soften", False)
+    # 0) EMPTY CALL: if no args, fire any pending soft exception, else default
+    if not args and message is None and not soften:
+        # raise accumulated soft‐exception if present
+        if no._pending is not None:
+            exc = no._pending
+            no._pending = None
+            raise exc
+        # otherwise default behavior
+        if isModule:
+            raise context._makeOne(0, None, None)
+        raise context
 
-    if kwargs:
-        raise TypeError(f"Unsupported keyword args: {kwargs}")
-
-    exc_type, exc_value, exc_tb = sys.exc_info()
-
-    # For NoModule, registry is context._registry
-    registry = context._registry if isModule else None
-
-    # Handle list of codes
+    # 1) EXCEPTION GROUP: a single list-of-codes argument
     if len(args) == 1 and isinstance(args[0], list):
         codes = args[0]
         frame = inspect.stack()[1]
         caller = f"{frame.filename}:{frame.lineno}"
+        # build one exception per code
         if isModule:
-            exceptions = [context._makeOne(c, message, linked) for c in codes]
+            exceptions = [
+                context._makeOne(c, message, [])
+                for c in codes
+            ]
         else:
-            exceptions = [context.__class__(c, message) for c in codes]
+            exceptions = [
+                context.__class__(c, message)
+                for c in codes
+            ]
         raise ExceptionGroup("Multiple errors", exceptions)
 
-    # no(exc): no-op for module calls
+    # 2) NO-OP FOR RAW EXCEPTIONS: no(exc) on the module does nothing
     if len(args) == 1 and isinstance(args[0], BaseException):
         return
 
-    # no(code)
+    # 3) SINGLE-CODE CALL: no(code)
     if len(args) == 1 and isinstance(args[0], int):
         code = args[0]
-        soft = (context._registry.get(code, (None, "", [], False))[3]
-                if isModule else context._softCodes.get(code, False))
+        # lookup soft‐flag from registry or instance
+        soft_flag = (
+            context._registry.get(code, (None, "", [], False))[3]
+            if isModule
+            else context._softCodes.get(code, False)
+        )
 
-        # MODULE-PROPAGATION: append to existing NoBaseError
-        if isModule and isinstance(exc_value, NoBaseError):
-            context.propagate(exc_value, code)
+        # 3a) EARLY ACCUMULATION: if we already have a pending exception, append to it
+        if no._pending is not None:
+            pending = no._pending
+            default_msg = context._registry.get(code, (None, f"Error {code}", [], False))[1]
+            pending.addCode(code, default_msg)
             if message:
-                exc_value.addMessage(code, message)
-            exc_value._softCodes[code] = soft
-            if soft or soften:
-                return
-            raise exc_value.with_traceback(exc_tb)
+                pending.addMessage(code, message)
+            pending._softCodes[code] = soft_flag
+            return
 
-        # INSTANCE-PROPAGATION
-        if not isModule and isinstance(exc_value, NoBaseError):
-            defaultMsg = (registry.get(code, (None, f"Error {code}", [], soft))[1]
-                          if registry else f"Error {code}")
-            exc_value.addCode(code, defaultMsg)
-            exc_value.addMessage(code, message)
-            exc_value._softCodes[code] = soft
-            if soft or soften:
+        # 3b) PROPAGATION INTO EXISTING INSTANCE: notModule + context is NoBaseError
+        if not isModule and isinstance(context, NoBaseError):
+            default_msg = no._registry.get(code, (None, f"Error {code}", [], False))[1]
+            context.addCode(code, default_msg)
+            if message:
+                context.addMessage(code, message)
+            context._softCodes[code] = soft_flag
+            if soft_flag or soften:
+                no._pending = context
                 return
-            raise exc_value.with_traceback(exc_tb)
+            raise context.with_traceback(sys.exc_info()[2])
 
-        # fresh new exception
+        # 3c) NEW EXCEPTION
         frame = inspect.stack()[1]
         caller = f"{frame.filename}:{frame.lineno}"
-        if isModule:
-            exc = context._makeOne(code, message, linked)
-        else:
-            exc = context.__class__(code, message)
-        if soft or soften:
+        exc = (
+            context._makeOne(code, message, [])
+            if isModule
+            else context.__class__(code, message)
+        )
+        if soft_flag or soften:
+            no._pending = exc
             return
         raise exc
 
-    # no(code, exc)
-    if len(args) == 2 and isinstance(args[0], int) and isinstance(args[1], BaseException):
+    # 4) CODE+EXCEPTION LINK: no(code, exc)
+    if (
+        len(args) == 2
+        and isinstance(args[0], int)
+        and isinstance(args[1], BaseException)
+    ):
         code, exc_to_link = args
-        soft = (context._registry.get(code, (None, "", [], False))[3]
-                if isModule else context._softCodes.get(code, False))
+        soft_flag = (
+            context._registry.get(code, (None, "", [], False))[3]
+            if isModule
+            else context._softCodes.get(code, False)
+        )
+
         if isModule:
             exc = context._makeOne(code, message, [exc_to_link])
-            frame = inspect.stack()[1]
-            caller = f"{frame.filename}:{frame.lineno}"
-            if soft or soften:
+            if soft_flag or soften:
+                no._pending = exc
                 return
-            raise exc.with_traceback(exc_tb)
+            raise exc.with_traceback(sys.exc_info()[2])
         else:
+            default_msg = context._registry.get(code, (None, f"Error {code}", [], False))[1]
+            context.addCode(code, default_msg)
             context._recordLinkedException(exc_to_link)
-            if soft or soften:
+            if soft_flag or soften:
+                no._pending = context
                 return
-            raise context.with_traceback(exc_tb)
+            raise context.with_traceback(sys.exc_info()[2])
 
-    # no(code, str)
+    # 5) CODE+MESSAGE: no(code, "custom msg")
     if len(args) == 2 and isinstance(args[0], int) and isinstance(args[1], str):
-        code, msg = args
-        soft = (context._registry.get(code, (None, "", [], False))[3]
-                if isModule else context._softCodes.get(code, False))
+        code, custom_msg = args
+        soft_flag = (
+            context._registry.get(code, (None, "", [], False))[3]
+            if isModule
+            else context._softCodes.get(code, False)
+        )
 
-        # MODULE-MESSAGE-APPEND
-        if isModule and isinstance(exc_value, NoBaseError):
-            context.propagate(exc_value, code)
-            exc_value.addMessage(code, msg)
-            exc_value._softCodes[code] = soft
-            if soft or soften:
+        # 5a) ACCUMULATE ON PENDING
+        if no._pending is not None:
+            pending = no._pending
+            default_msg = context._registry.get(code, (None, f"Error {code}", [], False))[1]
+            pending.addCode(code, default_msg)
+            pending.addMessage(code, custom_msg)
+            pending._softCodes[code] = soft_flag
+            return
+
+        # 5b) PROPAGATION INTO INSTANCE
+        if not isModule and isinstance(context, NoBaseError):
+            context.addCode(code, no._registry.get(code, (None, "", [], False))[1])
+            context.addMessage(code, custom_msg)
+            context._softCodes[code] = soft_flag
+            if soft_flag or soften:
+                no._pending = context
                 return
-            raise exc_value.with_traceback(exc_tb)
+            raise context.with_traceback(sys.exc_info()[2])
 
-        # INSTANCE-MESSAGE-APPEND
-        if not isModule and isinstance(exc_value, NoBaseError):
-            context.addCode(code)
-            context.addMessage(code, msg)
-            if soft or soften:
-                return
-            raise exc_value.with_traceback(exc_tb)
-
-        # fresh new exception
-        if isModule:
-            frame = inspect.stack()[1]
-            caller = f"{frame.filename}:{frame.lineno}"
-            exc = context._makeOne(code, msg, linked)
-        else:
-            context.addCode(code)
-            context.addMessage(code, msg)
-            exc = context
-        if soft or soften:
+        # 5c) NEW EXCEPTION WITH CUSTOM MESSAGE
+        frame = inspect.stack()[1]
+        caller = f"{frame.filename}:{frame.lineno}"
+        exc = (
+            context._makeOne(code, custom_msg, [])
+            if isModule
+            else context.__class__(code, custom_msg)
+        )
+        if soft_flag or soften:
+            no._pending = exc
             return
         raise exc
 
+    # 6) FALLBACK: unsupported signature
     raise TypeError(f"Unsupported arguments for no(): {args}")
 
 no = NoModule()

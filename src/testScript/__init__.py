@@ -68,6 +68,25 @@ def testMultipleMessages():
         messages = noexcept.codes[700]
         assert any("Extra" in m for m in messages)
         assert any("Another" in m for m in messages)
+        
+def testCryNowRaiseLater():
+    try:
+        cryNowRaiseLater()
+    except no.xcpt as noexcept:
+        assert 665 in noexcept.codes
+        assert 666 in noexcept.codes
+        assert 667 in noexcept.codes
+        assert "Immediate failure" in noexcept.codes[666]
+        assert "Deferred failure" in noexcept.codes[667]
+
+def cryNowRaiseLater():
+    try:
+        thereIsNoTry() # type: ignore[no-untyped-call]
+    except Exception as exception:
+        no(665, exception)
+        no(666, message="Immediate failure")
+        no(667, message="Deferred failure")
+        no()
 
 def main():
     print("Running no-exceptions self-test...")
@@ -76,6 +95,9 @@ def main():
     no.register(404, "Not Found")
     no.register(500, "Server Error")
     no.register(123, "Soft Error", soft=True)
+    no.register(665, "Initial Error", soft=True)
+    no.register(666, "Evil error", soft=True)
+    no.register(667, "Neighbours of the Beast:", soft=True)
 
     # Run tests
     record("importNo", testImportNo)
@@ -86,6 +108,7 @@ def main():
     record("strOutput", testStrOutput)
     record("unregistered", testUnregistered)
     record("multipleMessages", testMultipleMessages)
+    record("cryNowRaiseLater", testCryNowRaiseLater)
 
     print("\nTest summary:")
     for name, ok in results.items():
