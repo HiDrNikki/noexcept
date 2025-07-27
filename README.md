@@ -123,7 +123,7 @@ In both cases the raw error that is thrown is linked to whatever code is passed.
 
 ```python
 no(123)
-if not no.bueno:
+if no.bueno:
     print("Issues detected")
 ```
 
