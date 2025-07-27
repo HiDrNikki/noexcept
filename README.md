@@ -7,7 +7,7 @@ A callable interface for structured exceptions in Python, allowing dynamic regis
 
 ### Features
 
-Dynamic Error Codes: Register custom error codes with default messages at runtime.
+Dynamic Error Codes: Register custom error codes with default complaints at runtime.
 
 Soft Errors: Define codes that don’t immediately raise exceptions, useful for warning accumulation.
 
@@ -17,7 +17,7 @@ Exception Linking: Attach underlying exceptions to your custom errors for full t
 
 ExceptionGroup Support: Bundle multiple error codes into a single ExceptionGroup.
 
-Rich String Output: Automatically include codes, messages, linked exceptions, and stack traces when converting to string.
+Rich String Output: Automatically include codes, complaints, linked exceptions, and stack traces when converting to string.
 
 ## Installation
 
@@ -44,11 +44,11 @@ from noexcept import no
 ```
 ### Register codes at startup
 ```python
-no.register(404, "Not Found")            # Standard error
+no.likey(404, "Not Found")            # Standard error
 
-no.register(500, "Server Error")         # Standard error
+no.likey(500, "Server Error")         # Standard error
 
-no.register(123, "Soft Error", soft=True)  # Soft (non-raising)
+no.likey(123, "Soft Error", soft=True)  # Soft (non-raising)
 ```
 ### Raising an Exception
 ```python
@@ -57,7 +57,7 @@ from noexcept import no
 try:
     no(404)
 
-except no.xcpt as noexcept:
+except no.way as noexcept:
     print(str(noexcept))
 
     # [404]
@@ -78,9 +78,9 @@ try:
 
 except ValueError as ve:
     try:
-        no(500, ve)  # Raises a no.xcpt with 500 as the linked ValueError
+        no(500, ve)  # Raises a no.way with 500 as the linked ValueError
 
-    except no.xcpt as noexcept:
+    except no.way as noexcept:
         print(noexcept)
 ```
 ### Linking Underlying Exceptions
@@ -106,31 +106,31 @@ except ExceptionGroup as eg:
 ```
 ### API Reference
 ```python
-no.register(code: int, message: str, soften: bool = False)
+no.likey(code: int, complaint: str, soften: bool = False)
 ```
 ### Register a new error code.
 ```python
 code: Numeric identifier.
 
-message: Default message for the code.
+complaint: Default complaint for the code.
 
 soften: If True, calling this code won’t raise immediately.
 
-no(code: int | list[int] | Exception, message: str = None, soften: bool = False)
+no(code: int | list[int] | Exception, complaint: str = None, soften: bool = False)
 ```
 ### Invoke or raise an error:
 ```python
-Single int: Raise or return a no.xcpt for that code.
+Single int: Raise or return a no.way for that code.
 
 list[int]: Raises an ExceptionGroup of all specified codes.
 
 Existing Exception: Links this exception under your codes.
 
-message: Append an extra message to the error.
+complaint: Append an extra complaint to the error.
 
 soften: Suppresses immediate raising for soft usage.
 
-no.xcpt
+no.way
 ```
 Base exception type for all registered errors. Inherits rich context and linking support.
 

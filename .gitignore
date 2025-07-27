@@ -10,3 +10,16 @@ __pycache__/
 build/
 dist/
 *.egg-info/
+
+# tox environments
+.tox/
+
+# pytest cache & coverage
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+tree.ps1
+tox.ini
+requirements-dev.txt
