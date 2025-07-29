@@ -2,6 +2,7 @@
 from __future__ import annotations
 import threading
 from typing import Dict, List, Optional, Tuple, Type, Set, overload, Callable, TypeVar, Any, cast
+import sys
 from contextlib import contextmanager
 from .exception import NoBaseException
 from rememory import RMDict, RMBlock, BlockSize
@@ -104,7 +105,7 @@ class NoModule:
     way: type["NoBaseException"]
 
     def __init__(self):
-        self._registry: RMDict[int, Tuple[Type[NoBaseException], str, List[int], bool]] = RMDict("registry")
+        self._registry: RMDict[int, Tuple[str, str, List[int], bool]] = RMDict("registry")
         self._pending: RMBlock[Optional[NoBaseException]] = RMBlock("no_pending", BlockSize.s4096)
         self._pending.value = None
         self._lock = threading.Lock()
@@ -282,8 +283,9 @@ class NoModule:
             name = f"Error{code}"
             excType = type(name, (NoBaseException,), {})
             setattr(self, name, excType)
+            setattr(sys.modules[__name__], name, excType)
             self._registry[code] = (
-                excType,
+                name,
                 defaultComplaint or f"Error {code}",
                 linkedCodes or [],
                 soft
@@ -313,9 +315,19 @@ class NoModule:
         linked: Optional[List[BaseException]]
     ) -> NoBaseException:
         with self._lock:
-            excType, defaultMsg, linkedCodes, softFlag = self._registry.get(
-                code, (NoBaseException, f"Error {code}", [], False)
+            excName, defaultMsg, linkedCodes, softFlag = self._registry.get(
+                code, ("NoBaseException", f"Error {code}", [], False)
             )
+
+        if excName == "NoBaseException":
+            excType = NoBaseException
+        else:
+            excType = getattr(sys.modules[__name__], excName, None)
+            if excType is None:
+                excType = type(excName, (NoBaseException,), {})
+                setattr(sys.modules[__name__], excName, excType)
+                setattr(self, excName, excType)
+
         softCodes = {code: softFlag}
         exc = excType(code, complaint, defaultComplaint=defaultMsg, linked={}, softCodes=softCodes)
         if linked:

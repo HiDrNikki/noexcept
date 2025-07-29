@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="noexcept",
-    version="1.5.0",
+    version="1.5.1",
     description="A callable interface for structured exceptions",
     long_description=open("README.md", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
@@ -19,7 +19,7 @@ setup(
     install_requires=["rememory"],
     entry_points={
         "console_scripts": [
-            "noexcept = testScript.__init__:main",
+            "noexcept = noexceptTestScript.__init__:main",
         ],
     },
     classifiers=[

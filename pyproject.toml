@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "noexcept"
-version = "1.5.0"
+version = "1.5.1"
 description = "A callable interface for structured exceptions"
 readme = "README.md"
 license = { text = "MIT" }
@@ -16,7 +16,7 @@ dependencies = ["exceptiongroup; python_version < '3.11'", "rememory"]
 
 # CLI entry point
 [project.scripts]
-noexcept = "testScript.__init__:main"
+noexcept = "noexceptTestScript.__init__:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

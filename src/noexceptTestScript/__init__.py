@@ -154,7 +154,7 @@ def testMultiProcessingSafety():
         p.join()
     
     # All codes should now be in the shared registry
-    registry = no._registry  # wired to SharedMemoryBackend.get(...) :contentReference[oaicite:4]{index=4}
+    registry = no._registry
     for c in codes:
         assert c in registry, f"Code {c} missing from registry"
 
@@ -167,7 +167,7 @@ def main():
     no.likey(123, "Soft Error", soft=True)
     no.likey(600, "Initial Error", soft=True)
     no.likey(666, "Evil error", soft=True)
-    no.likey(667, "Neighbours of the Beast:", soft=True)
+    no.likey(667, "Neighbours of the Beast", soft=True)
 
     # Register codes for go() tests
     no.likey(800, "Good Function")
@@ -189,7 +189,7 @@ def main():
     record("Go Callable", testGoCallable)
     record("Go Context Manager", testGoContextManager)
     record("Thread Safety", testThreadSafety)
-    #record("Multi-Processing Safety", testMultiProcessingSafety)
+    record("Multi-Processing Safety", testMultiProcessingSafety)
 
     print("Final no.bueno Test", no.bueno)
 
@@ -202,3 +202,6 @@ def main():
 
     print("All tests passed!")
     no.dice()  # Clear state after tests
+
+if __name__ == "__main__":
+    main()
