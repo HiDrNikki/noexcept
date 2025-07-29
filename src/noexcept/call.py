@@ -54,6 +54,8 @@ def _handleSingleCode(
         if complaint:
             pending.addMessage(code, complaint)
         pending._softCodes[code] = softFlag
+        # re-save pending to ensure modifications persist
+        no._pending.value = pending
         return
     # 3b) MODULE-PROPAGATION
     if isModule and isinstance(exception, NoBaseException):
@@ -106,6 +108,7 @@ def _handleCodeExceptionLink(
         if isModule
         else context._softCodes.get(code, False)
     )
+    print(f"Handling code exception link for code {code} with soft flag {softFlag}")
     if isModule:
         exc = context._makeOne(code, complaint, [exception])
         if softFlag or soften:
@@ -142,6 +145,8 @@ def _handleCodeMessage(
         pending.addCode(code, defaultMsg)
         pending.addMessage(code, complaint)
         pending._softCodes[code] = softFlag
+        # persist updated pending block
+        no._pending.value = pending
         return
     if not isModule and isinstance(context, NoBaseException):
         context.addCode(code, no._registry.get(code, (None, "", [], False))[1])
