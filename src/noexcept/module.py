@@ -4,6 +4,7 @@ import threading
 from typing import Dict, List, Optional, Tuple, Type, Set, overload, Callable, TypeVar, Any, cast
 from contextlib import contextmanager
 from .exception import NoBaseException
+from rememory import RMDict, RMBlock, BlockSize
 
 T = TypeVar("T")
 no: NoModule
@@ -102,6 +103,12 @@ See the project README for more examples and the full API reference.
 class NoModule:
     way: type["NoBaseException"]
 
+    def __init__(self):
+        self._registry: RMDict[int, Tuple[Type[NoBaseException], str, List[int], bool]] = RMDict("registry")
+        self._pending: RMBlock[Optional[NoBaseException]] = RMBlock("no_pending", BlockSize.s4096)
+        self._pending.value = None
+        self._lock = threading.Lock()
+
     def go(
         self,
         code: int,
@@ -144,14 +151,14 @@ class NoModule:
         its accumulated codes/messages. After this,
         no.bueno → False, no.nos → [], no.complaints → [].
         """
-        self._pending = None
+        self._pending.value = None
 
     @property
     def bueno(self) -> bool:
         """
         Returns true if there is a pending or an active no.way
         """
-        return self._pending is not None
+        return self._pending.value is not None
 
     @property
     def complaints(self) -> list[str]:
@@ -161,7 +168,7 @@ class NoModule:
         return that exception’s messages.  Failing both, return an empty list.
         """
         # 1) Cry-now stash
-        stash = self._pending
+        stash = self._pending.value
         if stash is None:
             # 2) Fallback to currently-caught NoBaseException
             import sys
@@ -186,8 +193,8 @@ class NoModule:
         return that exception's codes.  Failing both, return an empty dict.
         """
         # 1) “Cry-now” stash
-        if self._pending is not None:
-            return self._pending.nos
+        if self._pending.value is not None:
+            return cast(NoBaseException, self._pending.value).nos
 
         # 2) Fallback to the currently caught NoBaseException
         import sys
@@ -197,11 +204,6 @@ class NoModule:
 
         # 3) Nothing active
         return {}
-
-    def __init__(self):
-        self._registry: Dict[int, Tuple[Type[NoBaseException], str, List[int], bool]] = {}
-        self._pending: Optional[NoBaseException] = None
-        self._lock = threading.Lock()
 
     def likey(
         self,

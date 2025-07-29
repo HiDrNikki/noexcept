@@ -137,6 +137,26 @@ def testThreadSafety():
     registry = no._registry  # wired to SharedMemoryBackend.get(...) :contentReference[oaicite:4]{index=4}
     for c in codes:
         assert c in registry, f"Code {c} missing from registry"
+def worker(code):
+    # each process registers its own code
+    no.likey(code, f"Process-msg {code}")
+
+def testMultiProcessingSafety():
+    print("Testing multiprocessing safety...")
+    # Pick a batch of distinct codes
+    codes = list(range(2000, 2010))
+    
+    # Spawn processes
+    processes = [Process(target=worker, args=(c,)) for c in codes]
+    for p in processes:
+        p.start()
+    for p in processes:
+        p.join()
+    
+    # All codes should now be in the shared registry
+    registry = no._registry  # wired to SharedMemoryBackend.get(...) :contentReference[oaicite:4]{index=4}
+    for c in codes:
+        assert c in registry, f"Code {c} missing from registry"
 
 def main():
     print("Running no-exceptions self-test...")
@@ -169,6 +189,7 @@ def main():
     record("Go Callable", testGoCallable)
     record("Go Context Manager", testGoContextManager)
     record("Thread Safety", testThreadSafety)
+    #record("Multi-Processing Safety", testMultiProcessingSafety)
 
     print("Final no.bueno Test", no.bueno)
 

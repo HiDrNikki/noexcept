@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "noexcept"
-version = "1.3.0"
+version = "1.5.0"
 description = "A callable interface for structured exceptions"
 readme = "README.md"
 license = { text = "MIT" }
@@ -12,7 +12,7 @@ authors = [
   { name = "Nichola Walch", email = "littler.compression@gmail.com" }
 ]
 requires-python = ">=3.8"
-dependencies = ["exceptiongroup; python_version < '3.11'"]
+dependencies = ["exceptiongroup; python_version < '3.11'", "rememory"]
 
 # CLI entry point
 [project.scripts]
@@ -23,6 +23,3 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.setuptools.package-data]
-"no" = ["py.typed"]

@@ -6,14 +6,14 @@ if sys.version_info >= (3, 11):
 else:
     # backport installed via your env‑marker dependency
     from exceptiongroup import ExceptionGroup
-from typing import Any, List, Optional
+from typing import Any, List, Optional, cast
 from .module import no
 from .exception import NoBaseException
 
 def _handleEmptyCall(context: Any, isModule: bool) -> None:
     """0) EMPTY CALL: no args, no complaint, no soften"""
-    if no._pending is not None:
-        raise no._pending
+    if no._pending.value is not None:
+        raise no._pending.value
     if isModule:
         raise context._makeOne(0, None, None)
     raise context
@@ -47,8 +47,8 @@ def _handleSingleCode(
         else context._softCodes.get(code, False)
     )
     # 3a) EARLY ACCUMULATION
-    if no._pending is not None:
-        pending = no._pending
+    if no._pending.value is not None:
+        pending = cast(NoBaseException, no._pending.value)
         defaultMsg = context._registry.get(code, (None, f"Error {code}", [], False))[1]
         pending.addCode(code, defaultMsg)
         if complaint:
@@ -63,7 +63,7 @@ def _handleSingleCode(
             e.addMessage(code, complaint)
         e._softCodes[code] = softFlag
         if softFlag or soften:
-            no._pending = e
+            no._pending.value = e
             return
         raise e.with_traceback(traceback)
     # 3c) INSTANCE-PROPAGATION
@@ -74,7 +74,7 @@ def _handleSingleCode(
             context.addMessage(code, complaint)
         context._softCodes[code] = softFlag
         if softFlag or soften:
-            no._pending = context
+            no._pending.value = context
             return
         raise context.with_traceback(traceback)
     # 3d) FRESH NEW EXCEPTION
@@ -86,7 +86,7 @@ def _handleSingleCode(
         else context.__class__(code, complaint)
     )
     if softFlag or soften:
-        no._pending = exc
+        no._pending.value = exc
         return
     raise exc
 
@@ -109,7 +109,7 @@ def _handleCodeExceptionLink(
     if isModule:
         exc = context._makeOne(code, complaint, [exception])
         if softFlag or soften:
-            no._pending = exc
+            no._pending.value = exc
             return
         raise exc.with_traceback(traceback)
     else:
@@ -117,7 +117,7 @@ def _handleCodeExceptionLink(
         context.addCode(code, defaultMsg)
         context._recordLinkedException(exception)
         if softFlag or soften:
-            no._pending = context
+            no._pending.value = context
             return
         raise context.with_traceback(traceback)
 
@@ -136,8 +136,8 @@ def _handleCodeMessage(
         if isModule
         else context._softCodes.get(code, False)
     )
-    if no._pending is not None:
-        pending = no._pending
+    if no._pending.value is not None:
+        pending = cast(NoBaseException, no._pending.value)
         defaultMsg = context._registry.get(code, (None, f"Error {code}", [], False))[1]
         pending.addCode(code, defaultMsg)
         pending.addMessage(code, complaint)
@@ -148,7 +148,7 @@ def _handleCodeMessage(
         context.addMessage(code, complaint)
         context._softCodes[code] = softFlag
         if softFlag or soften:
-            no._pending = context
+            no._pending.value = context
             return
         raise context.with_traceback(traceback)
     frame = inspect.stack()[1]
@@ -159,7 +159,7 @@ def _handleCodeMessage(
         else context.__class__(code, complaint)
     )
     if softFlag or soften:
-        no._pending = exc
+        no._pending.value = exc
         return
     raise exc
 
