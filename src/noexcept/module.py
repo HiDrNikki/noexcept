@@ -103,6 +103,7 @@ See the project README for more examples and the full API reference.
 """
 class NoModule:
     way: type["NoBaseException"]
+    hideTraceback: bool = False
 
     def __init__(self):
         self._registry: RMDict[int, Tuple[str, str, List[int], bool]] = RMDict("registry")
@@ -132,8 +133,13 @@ class NoModule:
             try:
                 return fn(*args, **kwargs)
             except Exception as exc:
-                # record under `code`, swallow or re-raise based on soften
-                self(code, exc, soften=soften)
+                # propagate if the failure is already a no.way
+                if isinstance(exc, NoBaseException):
+                    # add the new code to the existing exception
+                    self(code, soften=soften)
+                else:
+                    # record under `code`, swallow or re-raise based on soften
+                    self(code, exc, soften=soften)
                 return None
 
         # Context-manager path
@@ -142,8 +148,11 @@ class NoModule:
             try:
                 yield
             except Exception as exc:
-                # record & swallow
-                self(code, exc, soften=soften)
+                if isinstance(exc, NoBaseException):
+                    self(code, soften=soften)
+                else:
+                    # record & swallow
+                    self(code, exc, soften=soften)
         return _ctx()
     
     def dice(self) -> None:
@@ -153,6 +162,12 @@ class NoModule:
         no.bueno → False, no.nos → [], no.complaints → [].
         """
         self._pending.value = None
+        
+    def traceback(self) -> None:
+        """
+        Hide the traceback when raising exceptions.
+        """
+        self.hideTraceback = True
 
     @property
     def bueno(self) -> bool:
@@ -205,6 +220,15 @@ class NoModule:
 
         # 3) Nothing active
         return {}
+
+    @overload
+    def likey(self, code: int, defaultComplaint: str) -> None: ...
+    @overload
+    def likey(self, code: int, defaultComplaint: str, *, soft: bool) -> None: ...
+    @overload
+    def likey(self, code: int, defaultComplaint: str, linkedCodes: Optional[List[int]]) -> None: ...
+    @overload
+    def likey(self, code: int, defaultComplaint: str, linkedCodes: Optional[List[int]], *, soft:bool) -> None: ...
 
     def likey(
         self,

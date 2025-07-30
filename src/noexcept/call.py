@@ -114,6 +114,7 @@ def _handleCodeExceptionLink(
         if softFlag or soften:
             no._pending.value = exc
             return
+        if no.hideTraceback: raise exc
         raise exc.with_traceback(traceback)
     else:
         defaultMsg = context._registry.get(code, (None, f"Error {code}", [], False))[1]
@@ -122,6 +123,7 @@ def _handleCodeExceptionLink(
         if softFlag or soften:
             no._pending.value = context
             return
+        if no.hideTraceback: raise context
         raise context.with_traceback(traceback)
 
 

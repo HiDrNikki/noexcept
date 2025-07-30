@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="noexcept",
-    version="1.5.2",
+    version="1.5.3",
     description="A callable interface for structured exceptions",
     long_description=open("README.md", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
