@@ -137,7 +137,7 @@ class NoBaseException(Exception):
         return _handleCall(self, False, *args, **kwargs)
 
     def __str__(self) -> str:
-        parts = [f"noexcept caught an error:\n[{','.join(map(str, self.nos.keys()))}]"]
+        parts = [f"[{','.join(map(str, self.nos.keys()))}]"]
         for code, msgs in self.nos.items():
             parts.extend(msgs)
 

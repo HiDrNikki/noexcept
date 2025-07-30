@@ -104,11 +104,12 @@ See the project README for more examples and the full API reference.
 class NoModule:
     way: type["NoBaseException"]
     hideTraceback: bool = False
-
+    pending: RMBlock[Optional["NoBaseException"]]
+    
     def __init__(self):
         self._registry: RMDict[int, Tuple[str, str, List[int], bool]] = RMDict("registry")
-        self._pending: RMBlock[Optional[NoBaseException]] = RMBlock("no_pending", BlockSize.s4096)
-        self._pending.value = None
+        self.pending: RMBlock[Optional[NoBaseException]] = RMBlock("nopending", BlockSize.s4096)
+        self.pending.value = None
         self._lock = threading.Lock()
 
     def go(
@@ -161,7 +162,7 @@ class NoModule:
         its accumulated codes/messages. After this,
         no.bueno → False, no.nos → [], no.complaints → [].
         """
-        self._pending.value = None
+        self.pending.value = None
         
     def traceback(self) -> None:
         """
@@ -174,7 +175,7 @@ class NoModule:
         """
         Returns true if there is a pending or an active no.way
         """
-        return self._pending.value is not None
+        return self.pending.value is not None
 
     @property
     def complaints(self) -> list[str]:
@@ -184,7 +185,7 @@ class NoModule:
         return that exception’s messages.  Failing both, return an empty list.
         """
         # 1) Cry-now stash
-        stash = self._pending.value
+        stash = self.pending.value
         if stash is None:
             # 2) Fallback to currently-caught NoBaseException
             import sys
@@ -209,8 +210,8 @@ class NoModule:
         return that exception's codes.  Failing both, return an empty dict.
         """
         # 1) “Cry-now” stash
-        if self._pending.value is not None:
-            return cast(NoBaseException, self._pending.value).nos
+        if self.pending.value is not None:
+            return cast(NoBaseException, self.pending.value).nos
 
         # 2) Fallback to the currently caught NoBaseException
         import sys

@@ -12,10 +12,16 @@ from .exception import NoBaseException
 
 def _handleEmptyCall(context: Any, isModule: bool) -> None:
     """0) EMPTY CALL: no args, no complaint, no soften"""
-    if no._pending.value is not None:
-        raise no._pending.value
+    if no.pending.value is not None:
+        if no.hideTraceback: raze(no.pending.value)
+        raise no.pending.value
+    
     if isModule:
-        raise context._makeOne(0, None, None)
+        exception = context._makeOne(0, None, [])
+        if no.hideTraceback: raze(exception)
+        raise exception
+    
+    if no.hideTraceback: raze(context)
     raise context
 
 
@@ -27,6 +33,7 @@ def _handleExceptionGroup(context: Any, isModule: bool, codes: List[int], compla
         exceptions = [context._makeOne(c, complaint, []) for c in codes]
     else:
         exceptions = [context.__class__(c, complaint) for c in codes]
+        if no.hideTraceback: raze(exceptions[0])
     raise ExceptionGroup("Multiple errors", exceptions)
 
 
@@ -47,15 +54,15 @@ def _handleSingleCode(
         else context._softCodes.get(code, False)
     )
     # 3a) EARLY ACCUMULATION
-    if no._pending.value is not None:
-        pending = cast(NoBaseException, no._pending.value)
+    if no.pending.value is not None:
+        pending = cast(NoBaseException, no.pending.value)
         defaultMsg = context._registry.get(code, (None, f"Error {code}", [], False))[1]
         pending.addCode(code, defaultMsg)
         if complaint:
             pending.addMessage(code, complaint)
         pending._softCodes[code] = softFlag
         # re-save pending to ensure modifications persist
-        no._pending.value = pending
+        no.pending.value = pending
         return
     # 3b) MODULE-PROPAGATION
     if isModule and isinstance(exception, NoBaseException):
@@ -65,9 +72,10 @@ def _handleSingleCode(
             e.addMessage(code, complaint)
         e._softCodes[code] = softFlag
         if softFlag or soften:
-            no._pending.value = e
+            no.pending.value = e
             return
-        raise e.with_traceback(traceback)
+        if no.hideTraceback: raze(e)
+        raise e
     # 3c) INSTANCE-PROPAGATION
     if not isModule and isinstance(context, NoBaseException):
         defaultMsg = no._registry.get(code, (None, f"Error {code}", [], False))[1]
@@ -76,9 +84,10 @@ def _handleSingleCode(
             context.addMessage(code, complaint)
         context._softCodes[code] = softFlag
         if softFlag or soften:
-            no._pending.value = context
+            no.pending.value = context
             return
-        raise context.with_traceback(traceback)
+        if no.hideTraceback: raze(context)
+        raise context
     # 3d) FRESH NEW EXCEPTION
     frame = inspect.stack()[1]
     caller = f"{frame.filename}:{frame.lineno}"
@@ -88,8 +97,9 @@ def _handleSingleCode(
         else context.__class__(code, complaint)
     )
     if softFlag or soften:
-        no._pending.value = exc
+        no.pending.value = exc
         return
+    if no.hideTraceback: raze(exc)
     raise exc
 
 
@@ -112,19 +122,19 @@ def _handleCodeExceptionLink(
     if isModule:
         exc = context._makeOne(code, complaint, [exception])
         if softFlag or soften:
-            no._pending.value = exc
+            no.pending.value = exc
             return
-        if no.hideTraceback: raise exc
-        raise exc.with_traceback(traceback)
+        if no.hideTraceback: raze(exc)
+        raise exc
     else:
         defaultMsg = context._registry.get(code, (None, f"Error {code}", [], False))[1]
         context.addCode(code, defaultMsg)
         context._recordLinkedException(exception)
         if softFlag or soften:
-            no._pending.value = context
+            no.pending.value = context
             return
-        if no.hideTraceback: raise context
-        raise context.with_traceback(traceback)
+        if no.hideTraceback: raze(context)
+        raise context
 
 
 def _handleCodeMessage(
@@ -141,23 +151,24 @@ def _handleCodeMessage(
         if isModule
         else context._softCodes.get(code, False)
     )
-    if no._pending.value is not None:
-        pending = cast(NoBaseException, no._pending.value)
+    if no.pending.value is not None:
+        pending = cast(NoBaseException, no.pending.value)
         defaultMsg = context._registry.get(code, (None, f"Error {code}", [], False))[1]
         pending.addCode(code, defaultMsg)
         pending.addMessage(code, complaint)
         pending._softCodes[code] = softFlag
         # persist updated pending block
-        no._pending.value = pending
+        no.pending.value = pending
         return
     if not isModule and isinstance(context, NoBaseException):
         context.addCode(code, no._registry.get(code, (None, "", [], False))[1])
         context.addMessage(code, complaint)
         context._softCodes[code] = softFlag
         if softFlag or soften:
-            no._pending.value = context
+            no.pending.value = context
             return
-        raise context.with_traceback(traceback)
+        if no.hideTraceback: raze(context)
+        raise context
     frame = inspect.stack()[1]
     caller = f"{frame.filename}:{frame.lineno}"
     exc = (
@@ -166,8 +177,9 @@ def _handleCodeMessage(
         else context.__class__(code, complaint)
     )
     if softFlag or soften:
-        no._pending.value = exc
+        no.pending.value = exc
         return
+    if no.hideTraceback: raze(exc)
     raise exc
 
 
@@ -194,3 +206,8 @@ def _handleCall(context: Any, isModule: bool, *args: Any, complaint: Optional[st
         return _handleCodeMessage(context, isModule, args[0], args[1], soften, exceptionTraceback)
     # fallback
     raise TypeError(f"Unsupported arguments for no(): {args}")
+
+def raze(exception: NoBaseException) -> None:
+    """Raise the no.way."""
+    print(exception)
+    sys.exit(1)
