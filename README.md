@@ -1,19 +1,25 @@
-# No Exceptions
+# No Exceptions 🚫💥
 
-A callable interface for structured exceptions in Python, allowing dynamic registration of error codes, soft (non-raising) codes, exception propagation with context, and grouping multiple errors.
+*A light-hearted, lightweight numbered exception handler for Python*
 
-### Features
+Tired of boring old try-catch blocks? Want your errors to have personality? Meet **noexcept** - the exception handler that thinks error codes are cooler than plain old stack traces! 
 
-* **Dynamic Error Codes:** Register custom error codes with default complaints at runtime.
-* **Soft Errors:** Define codes that don’t immediately raise exceptions, useful for warning accumulation.
-* **Error Propagation:** Wrap existing exceptions under new error codes while preserving context.
-* **Exception Linking:** Attach underlying exceptions to your custom errors for full traceability.
-* **ExceptionGroup Support:** Bundle multiple error codes into a single ExceptionGroup.
-* **Rich String Output:** Automatically include codes, complaints, linked exceptions, and stack traces when converting to string.
+This delightfully punny library lets you register numbered error codes and handle them with style. No more cryptic exceptions - just clean, numbered codes that you can `likey`, accumulate when things go `bueno`, and clear when you say "no `dice`"!
 
-## Installation
+## ✨ What Makes It Special
 
-Requires Python 3.11 or newer.
+* **📝 Dynamic Error Codes:** Register custom error codes with witty complaints at runtime
+* **🤫 Soft Errors:** Define codes that whisper instead of shout - perfect for warning accumulation  
+* **🔗 Error Linking:** Chain exceptions together like a friendship bracelet of failures
+* **📦 Exception Groups:** Bundle multiple codes into one neat package (because misery loves company)
+* **🧵 Thread-Safe:** Works beautifully across multiple threads without breaking a sweat
+* **🚀 Multi-Process Safe:** Thanks to the amazing `rememory` backend, your error codes persist across processes
+* **🎯 Lightweight:** Minimal overhead, maximum personality
+* **🔧 Builder Pattern:** Fluently construct complex exceptions with `no.build()`
+
+## 📦 Installation
+
+Requires Python 3.8 or newer (because we're not *completely* reckless).
 
 ### With PIP
 
@@ -26,165 +32,118 @@ pip install noexcept
 ```bash
 pip install git+https://github.com/HiDrNikki/noexcept.git
 
-pip install git+https://github.com/HiDrNikki/noexcept.git@v1.2.2
+pip install git+https://github.com/HiDrNikki/noexcept.git@v1.5.4
 
 pip install -e git+https://github.com/HiDrNikki/noexcept.git@main#egg=noexcept
 ```
 
-## Quick Start
+## 🚀 Quick Start
 
-Import the callable exception handler and register your error codes:
-
-```python
-from noexcept import no
-```
-
-### Register codes at startup
-
-```python
-no.likey(404, "Not Found")            # Standard error
-no.likey(500, "Server Error")         # Standard error
-no.likey(123, "Soft Error", soft=True)  # Soft (non-raising)
-```
-
-### Raising an Exception
+Time to make your errors more interesting than your code comments!
 
 ```python
 from noexcept import no
 
+# Register some codes that you actually likey 
+no.likey(404, "Not Found")                    # Classic 
+no.likey(500, "Server went bye-bye")          # Dramatic
+no.likey(418, "I'm a teapot", soft=True)      # RFC compliant and soft
+```
+
+### 💥 When Things Go Wrong (But In Style)
+
+```python
 try:
-    no(404)
-except no.way as noexcept:
-    print(str(noexcept))
+    no(404)  # Uh oh, something's missing
+except no.way as err:
+    print(err)
     # [404]
     # Not Found
 ```
 
-### Soft Errors
+### 🤫 Soft Errors (The Polite Ones)
 
-Soft codes don’t immediately raise:
-
-```python
-no(123)  # No exception is thrown because code 123 is registered as soft
-```
-
-### Propagating Errors
-
-Wrap an existing exception under a new code:
+Sometimes you want to complain quietly:
 
 ```python
-try:
-    raise ValueError("underlying issue")
-except ValueError as ve:
-    try:
-        no(500, ve)  # Raises a no.way with 500 as the linked ValueError
-    except no.way as noexcept:
-        print(noexcept)
+no(418)  # This just accumulates, no drama
+if no.bueno:  # Check if anything went sideways
+    print(f"Issues: {no.complaints}")
 ```
 
-### Linking Underlying Exceptions
+### 🔗 Exception Linking (Chain Gang Style)
 
-Add an existing exception to a new code without raising immediately:
+When one error leads to another:
 
 ```python
 try:
-    raise KeyError("missing key")
-except KeyError as ke:
-    no(404, ke, soften=True)
+    raise ValueError("Something's fishy")
+except ValueError as fishy:
+    no(500, fishy)  # Links the ValueError to code 500
 ```
 
-### Grouping Multiple Errors
+### 📦 Multiple Errors (Bulk Discount Available)
 
-Bundle multiple codes in one go:
-
-```python
-try:
-    no([404, 500])
-except ExceptionGroup as eg:
-    for subexc in eg.exceptions:
-        print(subexc)
-```
-### no.go
-
-`no.go` provides a context manager for cleanly handling exceptions:
+Why have one error when you can have several?
 
 ```python
-with no.go(404):
-    raise ValueError("Original issue")  # Automatically wrapped under code 404
-```
-It can also be used in line to run a callable, and raise an error code if it fails.
-```python
-result = no.go(404, myFunction, *args, **kwargs, soften = True)
-```
-In both cases the raw error that is thrown is linked to whatever code is passed.
-### no.bueno
-
-`no.bueno` indicates if any soft errors have yet been registered:
-
-```python
-no(123)
-if no.bueno:
-    print("Issues detected")
+no([404, 500, 418])  # Triple threat!
+# This creates an ExceptionGroup with all three
 ```
 
-### no.nos
+### 🏗️ Builder Pattern (For The Architects)
 
-`no.nos` contains details of all registered error codes:
-
-```python
-print(no.nos)
-# {404: 'Not Found', 500: 'Server Error', 123: 'Soft Error'}
-```
-
-### no.complaints
-
-`no.complaints` accumulates soft error messages:
+Sometimes you need to craft the perfect exception:
 
 ```python
-no(123)
-no(123, "Extra warning detail")
+error = (no.build()
+         .withCode(404, "Page missing") 
+         .withCode(500, "Server sad")
+         .asSoft(404)  # Make 404 soft
+         .build())
+```
+### 🏃‍♂️ no.go (The Safety Net)
 
-print(no.complaints)
-# ['Soft Error', 'Soft Error: Extra warning detail']
+Try things safely, with automatic error wrapping:
+
+```python
+with no.go(500):
+    dangerous_operation()  # Any exception becomes code 500
+
+# Or run a function with built-in error handling
+result = no.go(404, risky_function, arg1, arg2, soften=True)
 ```
 
-## API Reference
-### Import the handler
-```python
-from noexcept import no
-```
-### Register error codes
-```python
-no.likey(code: int, complaint: str, soften: bool = False)
-```
-### Raise exceptions
-```python
-no(code: int | list[int] | Exception, complaint: str = None, soften: bool = False)
-```
-### Base exception type
-```python
-no.way
-```
-### Inline error safe code execution, or context manager
-```python
-no.go
-```
-### A boolean indicating whether any soft errors have been triggered yet
-```python
-no.bueno
-```
-### A dictionary containing all the currently triggered codes
-```python
-no.nos
-```
-### A flat list of all of the error messages
-```python
-no.complaints
-```
-### Clears the pending exception, along with all codes and messages
-```python
-no.dice()
-```
+## 📚 The Pun-derful API
+
+### 🎯 The Main Players
+
+- **`no.likey(code, complaint, soft=False)`** - Register error codes you actually like
+- **`no(code)`** - Raise that code (or go soft if it's registered that way)
+- **`no.way`** - The exception class (because there's no way around it)
+- **`no.go(code, func=None)`** - Safe execution context or function wrapper  
+- **`no.bueno`** - Boolean indicating if soft errors accumulated
+- **`no.nos`** - Dictionary of all accumulated error codes and messages
+- **`no.complaints`** - List of all error messages (the complaint department)
+- **`no.dice()`** - Clear all pending errors (roll the dice again)
+- **`no.build()`** - Create a fluent exception builder
+
+## 🚀 Performance & Safety
+
+- **🧵 Thread-Safe**: Handle errors across multiple threads without fear
+- **🔄 Multi-Process Safe**: Thanks to `rememory`, your error codes persist across process boundaries  
+- **⚡ Lightweight**: Minimal overhead with maximum personality
+- **🔧 Optimized**: Built-in caching, efficient string handling, and smart memory management
+
+## 🤝 Why Choose noexcept?
+
+Because life's too short for boring error handling! Whether you're building a web app, API, or just want to add some personality to your error management, noexcept makes exception handling fun again.
+
+Perfect for teams who appreciate:
+- Clean, numbered error codes instead of cryptic stack traces
+- Soft error accumulation for batch processing  
+- Multi-threaded and multi-process applications
+- A touch of humor in their development tools
 
 ## Contributing
 

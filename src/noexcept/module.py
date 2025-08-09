@@ -4,8 +4,11 @@ import threading
 from typing import Dict, List, Optional, Tuple, Type, Set, overload, Callable, TypeVar, Any, cast
 import sys
 from contextlib import contextmanager
-from .exception import NoBaseException
+from .exception import NoBaseException, NoBuilder
 from rememory import RMDict, RMBlock, BlockSize
+
+# Constants
+DEFAULT_BLOCK_SIZE = 4096
 
 T = TypeVar("T")
 no: NoModule
@@ -108,9 +111,11 @@ class NoModule:
     
     def __init__(self):
         self._registry: RMDict[int, Tuple[str, str, List[int], bool]] = RMDict("registry")
-        self.pending: RMBlock[Optional[NoBaseException]] = RMBlock("nopending", BlockSize.s4096)
+        self.pending: RMBlock[Optional[NoBaseException]] = RMBlock("nopending", BlockSize.s4096)  # Using DEFAULT_BLOCK_SIZE equivalent
         self.pending.value = None
         self._lock = threading.Lock()
+        # Thread-local storage for pending exceptions
+        self._thread_local = threading.local()
 
     def go(
         self,
@@ -158,15 +163,32 @@ class NoModule:
     
     def dice(self) -> None:
         """
-        “No dice”: wipe out any pending exception and
-        its accumulated codes/messages. After this,
-        no.bueno → False, no.nos → [], no.complaints → [].
+        "No dice": wipe out any pending exception and its accumulated codes/messages.
+        
+        This clears both thread-local and global pending exceptions, resetting the state
+        to a clean slate. After this call:
+        - no.bueno returns False
+        - no.nos returns an empty dict
+        - no.complaints returns an empty list
+        
+        This is useful for cleaning up state between tests or after handling a batch
+        of soft exceptions.
         """
         self.pending.value = None
+        # Clear thread-local pending as well
+        if hasattr(self._thread_local, 'pending'):
+            self._thread_local.pending = None
         
     def traceback(self) -> None:
         """
         Hide the traceback when raising exceptions.
+        
+        When called, this sets the hideTraceback flag which causes exceptions
+        to be printed to stdout and the program to exit with code 1, rather
+        than raising the exception normally with a full traceback.
+        
+        This is useful for production environments where you want cleaner
+        error output without the full Python stack trace.
         """
         self.hideTraceback = True
 
@@ -175,17 +197,19 @@ class NoModule:
         """
         Returns true if there is a pending or an active no.way
         """
-        return self.pending.value is not None
+        # Check thread-local pending first, then global pending
+        return (getattr(self._thread_local, 'pending', None) is not None or 
+                self.pending.value is not None)
 
     @property
     def complaints(self) -> list[str]:
         """
-        If there’s a pending “cry-now” exception, return its flattened messages.
-        Otherwise, if you’re inside an except block catching a NoBaseException,
-        return that exception’s messages.  Failing both, return an empty list.
+        If there's a pending "cry-now" exception, return its flattened messages.
+        Otherwise, if you're inside an except block catching a NoBaseException,
+        return that exception's messages.  Failing both, return an empty list.
         """
-        # 1) Cry-now stash
-        stash = self.pending.value
+        # 1) Check thread-local first, then global pending
+        stash = getattr(self._thread_local, 'pending', None) or self.pending.value
         if stash is None:
             # 2) Fallback to currently-caught NoBaseException
             import sys
@@ -205,13 +229,14 @@ class NoModule:
     @property
     def nos(self) -> Dict[int, List[str]]:
         """
-        If there's a pending “cry-now” exception, return its codes.
+        If there's a pending "cry-now" exception, return its codes.
         Otherwise, if you're inside an except block catching a NoBaseException,
         return that exception's codes.  Failing both, return an empty dict.
         """
-        # 1) “Cry-now” stash
-        if self.pending.value is not None:
-            return cast(NoBaseException, self.pending.value).nos
+        # 1) Check thread-local first, then global pending
+        stash = getattr(self._thread_local, 'pending', None) or self.pending.value
+        if stash is not None:
+            return cast(NoBaseException, stash).nos
 
         # 2) Fallback to the currently caught NoBaseException
         import sys
@@ -304,17 +329,25 @@ class NoModule:
         raise no.Error500("Custom override complaint")
         ```
         """
+        # Prepare data outside the lock to minimize lock time
+        name = f"Error{code}"
+        excType = type(name, (NoBaseException,), {})
+        registry_entry = (
+            name,
+            defaultComplaint or f"Error {code}",
+            linkedCodes or [],
+            soft
+        )
+        
+        # Critical section - minimize time holding lock
         with self._lock:
-            name = f"Error{code}"
-            excType = type(name, (NoBaseException,), {})
+            # Check if already registered to avoid duplicates
+            if code in self._registry:
+                return
+            
             setattr(self, name, excType)
             setattr(sys.modules[__name__], name, excType)
-            self._registry[code] = (
-                name,
-                defaultComplaint or f"Error {code}",
-                linkedCodes or [],
-                soft
-            )
+            self._registry[code] = registry_entry
 
     @overload
     def __call__(self, soften: bool = False) -> None: ...
@@ -366,6 +399,19 @@ class NoModule:
         return exc
 
     def propagate(self, exc: NoBaseException, newCode: int) -> None:
+        """
+        Add a new error code to an existing NoBaseException.
+        
+        This method is used internally to propagate error codes when one exception
+        is being wrapped or extended with additional error information.
+        
+        Parameters
+        ----------
+        exc : NoBaseException
+            The existing exception to add the code to
+        newCode : int
+            The error code to add
+        """
         msg = self._registry.get(newCode, (None, f"Error {newCode}", [], False))[1]
         soft = self._registry.get(newCode, (None, "", [], False))[3]
         exc.addCode(newCode, msg)
@@ -376,6 +422,16 @@ class NoModule:
         Language support is not implemented yet.
         """
         raise NotImplementedError("Language support not implemented yet.")
+    
+    def build(self) -> NoBuilder:
+        """
+        Create a new exception builder for complex exception creation.
+        
+        Example:
+        --------
+        exc = no.build().withCode(404, "Not Found").withCode(500, "Server Error").asSoft(404).build()
+        """
+        return NoBuilder()
     
 
 no = NoModule()
